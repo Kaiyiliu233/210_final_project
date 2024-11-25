@@ -1,4 +1,5 @@
 pub mod email;
+pub mod graph;
 
 use std::fs::File;
 use email::{EmailRecord, ParsedEmail};
@@ -67,6 +68,14 @@ fn read_csv(file_path: &str) -> Result<Vec<ParsedEmail>, Box<dyn Error>> {
 
     Ok(parsed_emails)
 }
+
+
+
+
+
+
+
+
 
 fn main() {
     // Path to your CSV file
