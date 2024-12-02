@@ -1,5 +1,7 @@
 use std::collections::{HashSet, HashMap};
 use crate::ParsedEmail;
+use rand::seq::SliceRandom;
+use rand::thread_rng;
 
 /// Struct to represent a directed, unweighted graph using an adjacency list
 #[derive(Debug)]
@@ -95,6 +97,64 @@ impl Graph {
         }
 
         in_degrees
+    }
+
+    /// Performs community detection using the Label Propagation Algorithm.
+    /// Returns a HashMap where each node is mapped to its community label.
+    pub fn label_propagation(&self) -> HashMap<String, String> {
+        // Initialize labels: each node is its own label
+        let mut labels: HashMap<String, String> = self.adjacency_list
+            .keys()
+            .map(|node| (node.clone(), node.clone()))
+            .collect();
+
+        let mut rng = thread_rng();
+
+        let max_iterations = 100; // Prevent infinite loops
+        for iteration in 0..max_iterations {
+            let mut changed = false;
+
+            // Collect all nodes and shuffle their order for random updates
+            let mut nodes: Vec<&String> = self.adjacency_list.keys().collect();
+            nodes.shuffle(&mut rng);
+
+            for node in nodes {
+                let neighbors = match self.get_neighbors(node) {
+                    Some(neigh) => neigh,
+                    None => continue, // Isolated node
+                };
+
+                if neighbors.is_empty() {
+                    continue; // No neighbors to influence the label
+                }
+
+                // Count the frequency of each label in the neighborhood
+                let mut label_counts: HashMap<&String, usize> = HashMap::new();
+                for neighbor in neighbors {
+                    if let Some(label) = labels.get(neighbor) {
+                        *label_counts.entry(label).or_insert(0) += 1;
+                    }
+                }
+
+                // Find the label(s) with the highest count
+                if let Some((&max_label, &max_count)) = label_counts.iter().max_by_key(|&(_, count)| count) {
+                    let current_label = labels.get(node).unwrap();
+                    if current_label != max_label {
+                        labels.insert(node.clone(), max_label.clone());
+                        changed = true;
+                    }
+                }
+            }
+
+            println!("Iteration {}: Labels changed: {}", iteration + 1, changed);
+
+            if !changed {
+                println!("Converged after {} iterations.", iteration + 1);
+                break;
+            }
+        }
+
+        labels
     }
 }
 

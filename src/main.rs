@@ -9,7 +9,7 @@ use std::collections::{HashMap, HashSet};
 
 fn main() -> Result<(), Box<dyn Error>> {
     // Path to your CSV file
-    let file_path = "test.csv";
+    let file_path = "emaildata_100000_0.csv";
 
     // Step 1: Read and parse the CSV
     let parsed_emails = read_csv(file_path)?;
@@ -31,7 +31,32 @@ fn main() -> Result<(), Box<dyn Error>> {
     let max_in_degree = in_degrees.values().cloned().max().unwrap_or(0);
     println!("Maximum out-degree: {}", max_out_degree);
     println!("Maximum in-degree: {}", max_in_degree);
+    // Perform Label Propagation
+    let communities = graph.label_propagation();
 
+    // Organize nodes by communities
+    let mut community_map: HashMap<String, Vec<String>> = HashMap::new();
+    for (node, label) in communities {
+        community_map.entry(label).or_insert(Vec::new()).push(node);
+    }
+
+    // Display communities
+    println!("Detected Communities:");
+    for (i, (label, members)) in community_map.iter().enumerate() {
+        println!("Community {}: {} members", i + 1, members.len());
+        // Optionally, list members:
+        // println!("{:?}", members);
+    }
+    // Step 4: Identify the community with the greatest number of members
+    if let Some((largest_label, largest_members)) = community_map.iter().max_by_key(|&(_, members)| members.len()) {
+        println!("\n---\nCommunity with the Greatest Number of Members:");
+        println!("Community Label: {}", largest_label);
+        println!("Number of Members: {}", largest_members.len());
+        // Optionally, list members:
+        // println!("Members: {:?}", largest_members);
+    } else {
+        println!("\nNo communities detected.");
+    }
     Ok(())
 }
 
@@ -213,4 +238,36 @@ fn test_self_loops_and_multiple_edges() {
     // Ensure only the expected nodes are present
     assert_eq!(out_degrees.len(), 3, "Graph should have 3 nodes");
     assert_eq!(in_degrees.len(), 3, "Graph should have 3 nodes");
+}
+
+#[test]
+fn test_label_propagation_small_graph() {
+    let mut graph = Graph::new();
+
+    // Community 1: A, B, C
+    graph.add_edge("A".to_string(), "B".to_string());
+    graph.add_edge("A".to_string(), "C".to_string());
+    graph.add_edge("B".to_string(), "C".to_string());
+
+    // Community 2: D, E, F
+    graph.add_edge("D".to_string(), "E".to_string());
+    graph.add_edge("D".to_string(), "F".to_string());
+    graph.add_edge("E".to_string(), "F".to_string());
+
+    // Perform Label Propagation
+    let labels = graph.label_propagation();
+
+    // Organize nodes by communities
+    let mut community_map: HashMap<String, Vec<String>> = HashMap::new();
+    for (node, label) in labels {
+        community_map.entry(label).or_insert(Vec::new()).push(node);
+    }
+
+    // Expect two communities
+    assert_eq!(community_map.len(), 2, "There should be 2 communities");
+
+    // Check sizes
+    for members in community_map.values() {
+        assert_eq!(members.len(), 3, "Each community should have 3 members");
+    }
 }
