@@ -7,30 +7,144 @@ use graph::{Graph};
 use std::error::Error;
 use std::collections::{HashMap, HashSet};
 
+fn analyze_degree_distribution(graph: &Graph) {
+    // Calculate out-degrees and in-degrees
+    let out_degrees = graph.calculate_out_degrees();
+    let in_degrees = graph.calculate_in_degrees();
+
+    // Calculate statistics for out-degrees
+    let total_nodes = out_degrees.len();
+    let total_out_degree: usize = out_degrees.values().sum();
+    let average_out_degree = total_out_degree as f64 / total_nodes as f64;
+    let max_out_degree = out_degrees.values().cloned().max().unwrap_or(0);
+    let min_out_degree = out_degrees.values().cloned().min().unwrap_or(0);
+
+    // Calculate statistics for in-degrees
+    let total_in_degree: usize = in_degrees.values().sum();
+    let average_in_degree = total_in_degree as f64 / total_nodes as f64;
+    let max_in_degree = in_degrees.values().cloned().max().unwrap_or(0);
+    let min_in_degree = in_degrees.values().cloned().min().unwrap_or(0);
+
+    // Display Out-Degree Statistics
+    println!("--- Out-Degree Statistics ---");
+    println!("Total Nodes: {}", total_nodes);
+    println!("Total Out-Degree: {}", total_out_degree);
+    println!("Average Out-Degree: {:.2}", average_out_degree);
+    println!("Maximum Out-Degree: {}", max_out_degree);
+    println!("Minimum Out-Degree: {}", min_out_degree);
+
+    // Display In-Degree Statistics
+    println!("\n--- In-Degree Statistics ---");
+    println!("Total Nodes: {}", total_nodes);
+    println!("Total In-Degree: {}", total_in_degree);
+    println!("Average In-Degree: {:.2}", average_in_degree);
+    println!("Maximum In-Degree: {}", max_in_degree);
+    println!("Minimum In-Degree: {}", min_in_degree);
+}
+
+/// Identifies the top N senders based on out-degree.
+pub fn identify_top_senders(out_degrees: &HashMap<String, usize>, top_n: usize) -> Vec<(String, usize)> {
+    let mut senders: Vec<(String, usize)> = out_degrees.iter()
+        .map(|(node, degree)| (node.clone(), *degree))
+        .collect();
+    
+    // Sort senders by out-degree in descending order
+    senders.sort_by(|a, b| b.1.cmp(&a.1));
+    
+    // Return the top N senders
+    senders.into_iter().take(top_n).collect()
+}
+
+/// Identifies the top N recipients based on in-degree.
+pub fn identify_top_recipients(in_degrees: &HashMap<String, usize>, top_n: usize) -> Vec<(String, usize)> {
+    let mut recipients: Vec<(String, usize)> = in_degrees.iter()
+        .map(|(node, degree)| (node.clone(), *degree))
+        .collect();
+    
+    // Sort recipients by in-degree in descending order
+    recipients.sort_by(|a, b| b.1.cmp(&a.1));
+    
+    // Return the top N recipients
+    recipients.into_iter().take(top_n).collect()
+}
+
+/// Identifies key statistics about the community
+fn analyze_communities(community_map: &HashMap<String, Vec<String>>) {
+    let total_communities = community_map.len();
+    println!("Total Detected Communities: {}", total_communities);
+
+    // Identify the size of each community
+    let mut community_sizes: Vec<usize> = community_map.values().map(|members| members.len()).collect();
+    community_sizes.sort_unstable_by(|a, b| b.cmp(a)); // Sort in descending order
+
+    // Calculate statistics
+    let total_nodes = community_sizes.iter().sum::<usize>();
+    let average_size = total_nodes as f64 / total_communities as f64;
+    let largest_size = community_sizes.first().cloned().unwrap_or(0);
+    let smallest_size = community_sizes.last().cloned().unwrap_or(0);
+
+    println!("Total Nodes: {}", total_nodes);
+    println!("Average Community Size: {:.2}", average_size);
+    println!("Largest Community Size: {}", largest_size);
+    println!("Smallest Community Size: {}", smallest_size);
+}
+
+/// Prints the top N senders and recipients.
+pub fn print_top_individuals(out_degrees: &HashMap<String, usize>, in_degrees: &HashMap<String, usize>, top_n: usize) {
+    let top_senders = identify_top_senders(out_degrees, top_n);
+    let top_recipients = identify_top_recipients(in_degrees, top_n);
+    
+    println!("\n--- Top {} Senders (Prolific Communicators) ---", top_n);
+    for (i, (sender, degree)) in top_senders.iter().enumerate() {
+        println!("{}. {} - Sent {} emails", i + 1, sender, degree);
+    }
+    
+    println!("\n--- Top {} Recipients (Information Hubs) ---", top_n);
+    for (i, (recipient, degree)) in top_recipients.iter().enumerate() {
+        println!("{}. {} - Received {} emails", i + 1, recipient, degree);
+    }
+}
+
+/// Identify and print the smallest and the largest community
+fn identify_extreme_communities(community_map: &HashMap<String, Vec<String>>) {
+    // Find the largest community
+    if let Some((largest_label, largest_members)) = community_map.iter().max_by_key(|&(_, members)| members.len()) {
+        println!("\n--- Largest Community ---");
+        println!("Community Label: {}", largest_label);
+        println!("Number of Members: {}", largest_members.len());
+        println!("Top 10 Members: {:?}", largest_members.iter().take(10).collect::<Vec<&String>>());
+    }
+
+    // Find the smallest community
+    if let Some((smallest_label, smallest_members)) = community_map.iter().min_by_key(|&(_, members)| members.len()) {
+        println!("\n--- Smallest Community ---");
+        println!("Community Label: {}", smallest_label);
+        println!("Number of Members: {}", smallest_members.len());
+        println!("Member: {:?}", smallest_members);
+    }
+}
+
 fn main() -> Result<(), Box<dyn Error>> {
     // Path to your CSV file
     let file_path = "emaildata_100000_0.csv";
 
-    // Step 1: Read and parse the CSV
+    // Read and parse the CSV
     let parsed_emails = read_csv(file_path)?;
 
-    // Step 2: Build the graph
+    // Build the graph
     let graph = Graph::build_from_emails(parsed_emails);
-    for (i, (node, neighbors)) in graph.adjacency_list.iter().enumerate() {
-        if node == "phillip.allen@enron.com" {
-            println!("Node {}: {:?}", node, neighbors);
-        }   
-    }
-    // Step 3: Perform analyses
-    // Degree calculations
-    let out_degrees = graph.calculate_out_degrees();
-    let in_degrees = graph.calculate_in_degrees();
 
-    // Print some degree statistics
-    let max_out_degree = out_degrees.values().cloned().max().unwrap_or(0);
-    let max_in_degree = in_degrees.values().cloned().max().unwrap_or(0);
-    println!("Maximum out-degree: {}", max_out_degree);
-    println!("Maximum in-degree: {}", max_in_degree);
+    // Perform Degree Distribution Analysis
+    analyze_degree_distribution(&graph);
+
+    // Calculate out-degrees and in-degrees
+     let out_degrees = graph.calculate_out_degrees();
+     let in_degrees = graph.calculate_in_degrees();
+        
+     // Identify and print top N senders and recipients
+     let top_n = 10; // Define how many top individuals to identify
+     print_top_individuals(&out_degrees, &in_degrees, top_n);
+        
     // Perform Label Propagation
     let communities = graph.label_propagation();
 
@@ -39,24 +153,12 @@ fn main() -> Result<(), Box<dyn Error>> {
     for (node, label) in communities {
         community_map.entry(label).or_insert(Vec::new()).push(node);
     }
+    // Analyze Communities
+    analyze_communities(&community_map);
 
-    // Display communities
-    println!("Detected Communities:");
-    for (i, (label, members)) in community_map.iter().enumerate() {
-        println!("Community {}: {} members", i + 1, members.len());
-        // Optionally, list members:
-        // println!("{:?}", members);
-    }
-    // Step 4: Identify the community with the greatest number of members
-    if let Some((largest_label, largest_members)) = community_map.iter().max_by_key(|&(_, members)| members.len()) {
-        println!("\n---\nCommunity with the Greatest Number of Members:");
-        println!("Community Label: {}", largest_label);
-        println!("Number of Members: {}", largest_members.len());
-        // Optionally, list members:
-        // println!("Members: {:?}", largest_members);
-    } else {
-        println!("\nNo communities detected.");
-    }
+    // Identify Extreme Communities
+    identify_extreme_communities(&community_map);
+
     Ok(())
 }
 
@@ -215,13 +317,9 @@ fn test_self_loops_and_multiple_edges() {
     // alice: 1 (bob)
     // bob: 1 (alice)
     // carol: 1 (carol)
-
     assert_eq!(out_degrees.get("alice@example.com"), Some(&1));
     assert_eq!(out_degrees.get("bob@example.com"), Some(&1));
     assert_eq!(out_degrees.get("carol@example.com"), Some(&1));
-
-    // Remove the following line as "dave@example.com" is not part of this test
-    // assert_eq!(out_degrees.get("dave@example.com"), Some(&0)); // Not present, hence should not be in the graph
 
     // Calculate in-degrees
     let in_degrees = graph.calculate_in_degrees();
@@ -230,7 +328,6 @@ fn test_self_loops_and_multiple_edges() {
     // alice: 1 (from bob)
     // bob: 1 (from alice)
     // carol: 1 (self-loop)
-
     assert_eq!(in_degrees.get("alice@example.com"), Some(&1));
     assert_eq!(in_degrees.get("bob@example.com"), Some(&1));
     assert_eq!(in_degrees.get("carol@example.com"), Some(&1));
@@ -253,6 +350,7 @@ fn test_label_propagation_small_graph() {
     graph.add_edge("D".to_string(), "E".to_string());
     graph.add_edge("D".to_string(), "F".to_string());
     graph.add_edge("E".to_string(), "F".to_string());
+    
 
     // Perform Label Propagation
     let labels = graph.label_propagation();

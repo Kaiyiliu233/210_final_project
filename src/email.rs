@@ -23,6 +23,7 @@ pub struct ParsedEmail {
     pub to: Vec<String>,
 }
 
+/// Parses the recipient string into a vector of individual email addresses
 pub fn parse_recipients(recipient: &str) -> Vec<String> {
     recipient
         .split(',')
@@ -39,52 +40,56 @@ pub fn read_csv(file_path: &str) -> Result<Vec<ParsedEmail>, Box<dyn Error>> {
         .has_headers(true)
         .from_reader(file);
 
-    let mut parsed_emails = Vec::new();
-    let mut failed_parses = 0;
+    let mut parsed_emails = Vec::new(); // Vector to store successfully parsed emails
+    let mut failed_parses = 0; // Counter for the number of failed parse attempts
 
+    // Iterate over each deserialized record in the CSV
     for result in rdr.deserialize() {
+        // Attempt to deserialize the current record into an EmailRecord struct
         let record: EmailRecord = match result {
-            Ok(rec) => rec,
+            Ok(rec) => rec, // Successfully deserialized record
             Err(e) => {
+                // Log the error and increment the failed parse counter
                 eprintln!("Failed to deserialize a record: {}", e);
                 failed_parses += 1;
-                continue;
+                continue; // Skip to the next record
             }
         };
 
-        // Parse recipients
+        // Parse the recipients string into a vector of email addresses
         let recipients = parse_recipients(&record.recipient1);
 
-        // Check for missing sender or recipients
+        // Check for missing sender or recipients to ensure data completeness
         if record.sender.is_empty() || recipients.is_empty() {
+            // Log the incomplete record details and increment the failed parse counter
             eprintln!(
                 "Incomplete record found at index {}: sender='{}', recipient1='{}'",
                 record.index, record.sender, record.recipient1
             );
             failed_parses += 1;
-            continue;
+            continue; // Skip to the next record
         }
 
-        // Create ParsedEmail instance
+        // Create a ParsedEmail instance with the sender and parsed recipients
         let parsed_email = ParsedEmail {
-            from: record.sender.clone(),
-            to: recipients,
+            from: record.sender.clone(), // Clone the sender's email address
+            to: recipients, // Assign the vector of recipient email addresses
         };
-        // For debugging: print first few parsed emails
-        if parsed_emails.len() < 5 {
-            println!("{:?}", parsed_email);
-        }
 
-        parsed_emails.push(parsed_email);
+        parsed_emails.push(parsed_email); // Add the ParsedEmail to the collection
     }
-
+    
+    // Print the number of successfully parsed emails
     println!(
         "Successfully parsed {} emails.",
         parsed_emails.len()
     );
+
+    // If there were any failed parses, log the total count
     if failed_parses > 0 {
         println!("Failed to parse {} records.", failed_parses);
     }
-
+    
+    // Return the vector of ParsedEmail instances
     Ok(parsed_emails)
 }
